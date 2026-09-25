@@ -22,7 +22,11 @@ def main(argv):
     settings = config.load_settings()
 
     if cmd == "scan":
-        print(pipeline.run_scan(db.connect(), settings))
+        conn = db.connect()
+        stats = pipeline.run_scan(conn, settings)
+        conn.close()  # checkpoints the WAL so the .db file alone holds everything
+        log.info(f"Result: {stats}")
+        return 1 if stats["error"] and not stats["fetched"] else 0
     elif cmd == "check-yad2":
         src = Yad2Source(settings)
         city = settings["yad2"]["cities"][0]

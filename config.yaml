@@ -6,7 +6,7 @@ search:
   city: "תל אביב יפו"          # compared against the listing's city text
   min_rooms: 4
   max_rooms: 4
-  min_price: 0
+  min_price: 4000            # filters out single-room / roommate-room ads
   max_price: 12000
   min_size: 80                # m²; listings with unknown size are kept, not rejected
   exclude_ground_floor: true  # rejects floor <= 0; unknown floor is kept
