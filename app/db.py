@@ -68,6 +68,12 @@ CREATE TABLE IF NOT EXISTS notifications (
     UNIQUE (listing_id, channel, kind)
 );
 
+-- Small key/value store: Telegram update offset, settings changed from the bot.
+CREATE TABLE IF NOT EXISTS kv (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
 CREATE TABLE IF NOT EXISTS scans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     started_at TEXT NOT NULL, finished_at TEXT,
@@ -101,6 +107,21 @@ def _to_db(field, value):
     if field == "images":
         return json.dumps(value or [], ensure_ascii=False)
     return value
+
+
+def kv_get(conn, key, default=None):
+    row = conn.execute("SELECT value FROM kv WHERE key=?", (key,)).fetchone()
+    return json.loads(row[0]) if row else default
+
+
+def kv_set(conn, key, value):
+    conn.execute("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                 (key, json.dumps(value, ensure_ascii=False)))
+    conn.commit()
+
+
+def find_listing(conn, listing):
+    return _find(conn, listing)
 
 
 def _find(conn, listing):

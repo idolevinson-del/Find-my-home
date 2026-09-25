@@ -1,5 +1,42 @@
 const $ = (s, el = document) => el.querySelector(s);
+
+// Two modes: the local server (python run.py → /api/*) or the static site built
+// by GitHub Actions (data.json next to this file; statuses kept on this phone).
+let STATIC = null;
+const LOCAL_KEY = "hunter-status";
+const localStatus = () => { try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || "{}"); } catch { return {}; } };
+const setLocalStatus = (id, st) => { try { const m = localStatus(); m[id] = st; localStorage.setItem(LOCAL_KEY, JSON.stringify(m)); } catch {} };
+
+const DAY = 24 * 3600 * 1000;
+function staticListings(view) {
+  const overlay = localStatus();
+  const rows = STATIC.listings.map(r => ({ ...r, status: overlay[r.id] || r.status }));
+  const keep = { inbox: r => !["SAVED", "REJECTED", "TAKEN"].includes(r.status),
+                 saved: r => !["NEW", "REJECTED"].includes(r.status),
+                 rejected: r => r.status === "REJECTED", all: () => true }[view];
+  const now = Date.now();
+  return rows.filter(keep).map(r => ({ ...r, is_new: r.status === "NEW" && now - Date.parse(r.first_seen_at) < DAY }))
+    .sort((a, b) => (b.is_new - a.is_new) || ((b.match_score || 0) - (a.match_score || 0)));
+}
+function staticApi(path, opts) {
+  const [p, q] = path.split("?");
+  if (p === "/api/listings") return staticListings(new URLSearchParams(q).get("view") || "inbox");
+  if (p === "/api/settings") return STATIC.settings;
+  if (p === "/api/summary") {
+    const inbox = staticListings("inbox");
+    return { new: inbox.filter(r => r.is_new).length,
+      excellent: inbox.filter(r => (r.match_score || 0) >= 90).length,
+      good: inbox.filter(r => (r.match_score || 0) >= 75 && r.match_score < 90).length,
+      possible: inbox.filter(r => (r.match_score || 0) < 75).length,
+      total: inbox.length, saved: staticListings("saved").length,
+      last_scan: STATIC.last_scan, scanning: false, next_scan_at: null, telegram: true };
+  }
+  const m = p.match(/^\/api\/listings\/(\d+)\/status$/);
+  if (m) { setLocalStatus(m[1], JSON.parse(opts.body).status); return { ok: true }; }
+  throw new Error("not available on the static site");
+}
 const api = async (path, opts = {}) => {
+  if (STATIC) return staticApi(path, opts);
   const r = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   return r.json();
@@ -127,6 +164,10 @@ async function refreshSummary() {
 }
 
 $("#scan-btn").addEventListener("click", async () => {
+  if (STATIC) {
+    if (STATIC.repo) window.open(`https://github.com/${STATIC.repo}/actions/workflows/hunt.yml`, "_blank");
+    return;
+  }
   await api("/api/scan", { method: "POST" });
   wasScanning = true;
   $("#scan-btn").disabled = true;
@@ -139,7 +180,28 @@ async function poll() {
 }
 
 // ---------- settings ----------
+function renderStaticSettings() {
+  const s = settings.search, p = settings.preferences, n = settings.notifications;
+  const places = (settings.areas || []).map(g => `<li><b>${esc(g.name)}:</b> ${esc((g.places || []).join(", "))}</li>`).join("");
+  const bot = STATIC.bot ? `<a class="primary" href="https://t.me/${esc(STATIC.bot)}" target="_blank" rel="noopener">פתח את הבוט בטלגרם</a>` : "";
+  $("#settings").innerHTML = `<form onsubmit="return false">
+    <fieldset><legend>מה אני מחפש עכשיו</legend><ul>
+      <li>${esc(s.city)} · ${s.min_rooms === s.max_rooms ? s.min_rooms : `${s.min_rooms}–${s.max_rooms}`} חדרים</li>
+      <li>מחיר: מ-₪${fmt(s.min_price || 0)} עד ₪${fmt(s.max_price)} · מינימום ${s.min_size || 0} מ"ר</li>
+      <li>קומת קרקע: ${s.exclude_ground_floor ? "לא" : "כן"} · ${p.roommates} שותפים · התראה מציון ${n.min_score}</li>
+    </ul><ul>${places}</ul></fieldset>
+    <fieldset><legend>איך משנים</legend>
+      <p class="muted">שולחים הודעה לבוט בטלגרם, והשינוי נכנס לתוקף בסריקה הבאה (עד כ-10 דקות):</p>
+      <ul>
+        <li><b>תקציב 13000</b></li><li><b>חדרים 4</b> או <b>חדרים 3.5-5</b></li><li><b>גודל 80</b></li>
+        <li><b>קרקע לא</b> / <b>קרקע כן</b></li><li><b>הוסף אזור יפו</b> / <b>הסר אזור יפו</b></li>
+        <li><b>ציון 70</b> — ציון מינימלי להתראה</li><li><b>הגדרות</b> · <b>שמורות</b> · <b>עזרה</b></li>
+      </ul>${bot}
+    </fieldset></form>`;
+}
+
 function renderSettings() {
+  if (STATIC) return renderStaticSettings();
   const st = structuredClone(settings);
   const s = st.search, p = st.preferences, n = st.notifications;
   const num = (path, label, v, step = 1) => `<label>${label}<input type="number" step="${step}" data-path="${path}" value="${v ?? ""}"></label>`;
@@ -215,6 +277,14 @@ function renderSettings() {
 
 // ---------- boot ----------
 (async () => {
+  try {
+    const r = await fetch("data.json", { cache: "no-store" });
+    if (r.ok) STATIC = await r.json();
+  } catch {}
+  if (STATIC) {
+    $("#scan-btn").textContent = "🔄 סרוק עכשיו";
+    if (!STATIC.repo) $("#scan-btn").hidden = true;
+  }
   settings = await api("/api/settings");
   searchChips(settings);
   await loadList();

@@ -23,12 +23,20 @@ def configured():
     return bool(secret("TELEGRAM_BOT_TOKEN") and secret("TELEGRAM_CHAT_ID"))
 
 
-def format_message(row):
-    """Build the Hebrew alert text + inline 'open ad' button for a listing row."""
+def format_message(row, kind="new_listing"):
+    """Build the Hebrew alert text + inline buttons for a listing row.
+
+    kind: "new_listing" or "price_drop:<old>" (old price before the drop).
+    """
+    from app.notify.bot import status_keyboard
     e = html.escape
     score = row["match_score"]
     fire = "🔥" if (score or 0) >= 90 else "🏠"
-    lines = [f"{fire} <b>דירה חדשה שמתאימה לך</b>", f"<b>MATCH: {score}%</b>", ""]
+    if kind.startswith("price_drop:"):
+        old = int(kind.split(":", 1)[1])
+        lines = [f"🔻 <b>המחיר ירד</b>  ₪{old:,} → ₪{row['price']:,}", f"<b>MATCH: {score}%</b>", ""]
+    else:
+        lines = [f"{fire} <b>דירה חדשה שמתאימה לך</b>", f"<b>MATCH: {score}%</b>", ""]
     place = ", ".join(x for x in (row["neighborhood"], row["street"]) if x)
     if place:
         lines.append(f"📍 {e(place)}")
@@ -53,8 +61,7 @@ def format_message(row):
         lines += ["", f"🤖 {e(ai['summary'])}"]
     # Plain link too, not just the button — the phone number is on the ad page.
     lines += ["", f'🔗 <a href="{e(row["url"])}">למודעה ביד2 (טלפון ופרטים)</a>', e(row["url"])]
-    keyboard = {"inline_keyboard": [[{"text": "פתח מודעה", "url": row["url"]}]]}
-    return "\n".join(lines), keyboard
+    return "\n".join(lines), status_keyboard(row["url"], row["id"])
 
 
 def send(text, keyboard, session=requests):
@@ -81,11 +88,11 @@ def flush_outbox(conn, settings, session=requests):
     sent = 0
     for n in pending:
         row = db.get_listing(conn, n["listing_id"])
-        if row is None or row["status"] == "REJECTED":
+        if row is None or row["status"] in ("REJECTED", "TAKEN"):
             db.mark_notification(conn, n["id"], True)  # nothing to send; close it
             continue
         try:
-            send(*format_message(row), session=session)
+            send(*format_message(row, n["kind"]), session=session)
             db.mark_notification(conn, n["id"], True)
             sent += 1
         except Exception as ex:

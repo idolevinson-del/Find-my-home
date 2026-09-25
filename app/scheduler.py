@@ -26,7 +26,7 @@ class Scanner:
             return None
         self.running = True
         try:
-            return pipeline.run_scan(self.conn, config.load_settings())
+            return pipeline.run_cycle(self.conn, config.load_settings())
         except Exception as e:
             log.exception(f"Scan failed: {e}")
             return None

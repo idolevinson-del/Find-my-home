@@ -5,7 +5,24 @@ requirements once. It scans Yad2 in the background, scores each new listing
 against your requirements, shows the results on a local dashboard, and sends a
 Telegram message the moment a good match appears.
 
-MVP: **Yad2 only**, running on your own computer.
+MVP: **Yad2 only**. Runs in GitHub's cloud (no computer needed) or locally.
+
+## Running in the cloud (how it's set up now)
+
+- `.github/workflows/hunt.yml` scans every 10 minutes. The database lives on
+  the `bot-state` branch between runs.
+- Alerts go to Telegram with **❤️ Save / ❌ Not for me** buttons.
+- **Change the search by messaging the bot** in Hebrew: `תקציב 13000`,
+  `חדרים 3.5-5`, `גודל 80`, `קרקע לא`, `הוסף אזור יפו`, `הסר אזור יפו`,
+  `ציון 70`, `הגדרות`, `שמורות`, `עזרה`. Taps and commands are applied at the
+  start of the next scan (within ~10 minutes).
+- **Price drops** on listings you haven't rejected trigger a 🔻 alert.
+- The dashboard is published to GitHub Pages after every scan:
+  `https://<user>.github.io/<repo>/`. On the static site, Save/Reject are
+  remembered on that phone. The Telegram buttons are the synced version.
+- Secrets (repo Settings → Secrets → Actions): `TELEGRAM_BOT_TOKEN`,
+  `TELEGRAM_CHAT_ID`, and optionally `GEMINI_API_KEY`.
+- One-time: Settings → Pages → Source: **GitHub Actions**.
 
 ## Quick start
 

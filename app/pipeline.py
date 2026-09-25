@@ -6,7 +6,8 @@ import time
 
 from app import ai, db
 from app.filters import hard_filter, match_area
-from app.notify import telegram
+from app.models import Status
+from app.notify import bot, telegram
 from app.scoring import score_listing
 from app.sources.base import SourceError
 from app.sources.yad2 import Yad2Source
@@ -41,6 +42,17 @@ def rescore_all(conn, settings):
     return len(ids)
 
 
+def run_cycle(conn, base_settings, sources=None, http_session=None):
+    """What a scheduled run does: apply Telegram taps/commands, then scan with
+    the effective settings (config.yaml + changes made from the bot)."""
+    kw = {"session": http_session} if http_session else {}
+    changed = bot.process_updates(conn, base_settings, **kw)
+    settings = bot.effective_settings(conn, base_settings)
+    if changed:
+        rescore_all(conn, settings)
+    return run_scan(conn, settings, sources, http_session)
+
+
 def run_scan(conn, settings, sources=None, http_session=None):
     stats = {"fetched": 0, "passed": 0, "new": 0, "updated": 0, "notified": 0, "error": None}
     scan_id = db.start_scan(conn)
@@ -65,8 +77,13 @@ def run_scan(conn, settings, sources=None, http_session=None):
             listing = source.normalize(raw)
             if listing is None:
                 continue
+            prev = db.find_listing(conn, listing)
             listing_id, outcome = db.upsert_listing(conn, listing, raw)
             passes, _ = evaluate(conn, listing_id, settings)
+            if (outcome == "updated" and passes and prev is not None and prev["price"] and listing.price
+                    and listing.price < prev["price"] and prev["status"] not in (Status.REJECTED, Status.TAKEN)):
+                log.info(f"Price drop: listing {listing_id} ₪{prev['price']:,} → ₪{listing.price:,}")
+                db.enqueue_notification(conn, listing_id, kind=f"price_drop:{prev['price']}")
             stats["passed"] += int(passes)
             if outcome == "updated":
                 stats["updated"] += 1
