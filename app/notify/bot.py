@@ -30,8 +30,9 @@ HELP = """<b>פקודות</b> (אפשר בעברית, בלי סלאש):
 • <b>תקציב 13000</b> — מחיר מקסימלי
 • <b>חדרים 4</b> או <b>חדרים 3.5-5</b>
 • <b>גודל 80</b> — מינימום מ"ר
-• <b>קרקע לא</b> / <b>קרקע כן</b> — קומת קרקע
-• <b>הוסף אזור יפו</b> / <b>הסר אזור יפו</b>
+• <b>בלי קרקע</b> / <b>אפשר קרקע</b> — קומת קרקע
+• <b>הוסף אזור אילת</b> / <b>הסר אזור אילת</b> — שכונה או רחוב
+אפשר כמה פקודות בהודעה אחת, כל אחת בשורה נפרדת.
 • <b>אזורים</b> — רשימת האזורים
 • <b>ציון 70</b> — ציון מינימלי להתראה
 • <b>עזרה</b>
@@ -59,6 +60,22 @@ def status_keyboard(url, listing_id, status=None):
 
 def effective_settings(conn, base):
     return merge_settings(base, db.kv_get(conn, OVERRIDES, {}))
+
+
+PLACE_PREFIXES = ("רחוב ", "רח' ", "שכונת ", "שכונה ", "אזור ")
+PLACE_SUFFIXES = (" בתל אביב יפו", " בתל אביב", " תל אביב", " בת\"א", " בתא")
+
+
+def clean_place(text):
+    """'רחוב אילת בתל אביב' → 'אילת' (Yad2 writes just the street/neighborhood name)."""
+    p = text.strip().strip(".,")
+    for pre in PLACE_PREFIXES:
+        if p.startswith(pre):
+            p = p[len(pre):]
+    for suf in PLACE_SUFFIXES:
+        if p.endswith(suf):
+            p = p[: -len(suf)]
+    return p.strip()
 
 
 def _num(text):
@@ -110,9 +127,10 @@ def apply_command(conn, base, text):
             patch("search", "min_size", int(_num(m.group(1))))
             save()
             return f'✓ מינימום {int(_num(m.group(1)))} מ"ר', True
-        m = re.match(r"^(?:ground|קרקע)\s+(\S+)$", low)
+        m = re.match(r"^(?:ground|קרקע)\s+(\S+)$", low) or \
+            re.match(r"^(אפשר|מותר|כולל|עם|בלי|ללא|לא)\s+(?:קומת\s+)?קרקע$", low)
         if m:
-            allow = m.group(1) in ("כן", "on", "yes")
+            allow = m.group(1) in ("כן", "on", "yes", "אפשר", "מותר", "כולל", "עם")
             patch("search", "exclude_ground_floor", not allow)
             save()
             return "✓ קומת קרקע " + ("מותרת" if allow else "לא מוצגת"), True
@@ -123,7 +141,7 @@ def apply_command(conn, base, text):
             return f"✓ התראה רק מציון {m.group(1)}", True
         m = re.match(r"^(?:area_add|הוסף אזור)\s+(.+)$", t)
         if m:
-            place = m.group(1).strip()
+            place = clean_place(m.group(1))
             areas = copy.deepcopy(settings.get("areas") or [])
             if any(place in (g.get("places") or []) for g in areas):
                 return f"{place} כבר ברשימה", False
@@ -137,7 +155,7 @@ def apply_command(conn, base, text):
             return f"✓ נוסף אזור: {place}", True
         m = re.match(r"^(?:area_remove|הסר אזור)\s+(.+)$", t)
         if m:
-            place = m.group(1).strip()
+            place = clean_place(m.group(1))
             areas = copy.deepcopy(settings.get("areas") or [])
             found = False
             for g in areas:
@@ -207,8 +225,12 @@ def process_updates(conn, base, session=requests):
                     row = set_listing_status(conn, int(m.group(2)), status)
                     reply = "✓ עודכן" if row else "לא מצאתי את הדירה"
                 else:
-                    reply, did = apply_command(conn, base, text)
-                    changed |= did
+                    replies = []
+                    for line in [l for l in text.splitlines() if l.strip()]:
+                        r_, did = apply_command(conn, base, line)
+                        replies.append(r_)
+                        changed |= did
+                    reply = "\n".join(replies)
                 call("sendMessage", session, chat_id=chat_id, text=reply, parse_mode="HTML",
                      disable_web_page_preview=True)
         except Exception as e:

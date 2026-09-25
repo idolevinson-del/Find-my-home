@@ -129,3 +129,16 @@ def test_site_build(conn, settings, feed, tmp_path, monkeypatch):
     assert n == 2 and len(data["listings"]) == 2 and data["repo"] == "me/repo"
     html = (tmp_path / "site" / "index.html").read_text(encoding="utf-8")
     assert 'src="app.js"' in html and "/static/" not in html
+
+
+def test_multi_line_natural_commands(conn, settings):
+    tg = FakeTelegram([msg(1, "הוסף אזור רחוב אילת בתל אביב\nאפשר קרקע")])
+    assert bot.process_updates(conn, settings, session=tg)
+    s = bot.effective_settings(conn, settings)
+    assert "אילת" in [p for g in s["areas"] for p in g["places"]]
+    assert s["search"]["exclude_ground_floor"] is False
+    reply = tg.sent("sendMessage")[0]["text"]
+    assert "אילת" in reply and "קרקע" in reply and "לא הבנתי" not in reply
+    tg = FakeTelegram([msg(2, "בלי קרקע")])
+    bot.process_updates(conn, settings, session=tg)
+    assert bot.effective_settings(conn, settings)["search"]["exclude_ground_floor"] is True
