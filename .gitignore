@@ -1,0 +1,23 @@
+# Secrets
+.env
+
+# Runtime data (DB, logs)
+data/
+*.db
+*.db-wal
+*.db-shm
+*.log
+config.yaml.tmp
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

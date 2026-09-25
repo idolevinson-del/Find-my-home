@@ -1,0 +1,69 @@
+# Apartment Hunter TLV — search settings.
+# Everything here can be changed from the Settings screen in the dashboard
+# (which rewrites this file). No secrets here — those live in .env.
+
+search:
+  city: "תל אביב יפו"          # compared against the listing's city text
+  min_rooms: 4
+  max_rooms: 4
+  min_price: 0
+  max_price: 12000
+  min_size: 80                # m²; listings with unknown size are kept, not rejected
+  exclude_ground_floor: true  # rejects floor <= 0; unknown floor is kept
+  # "require" = only listings in the areas below pass the hard filters.
+  # "prefer"  = every area passes; preferred areas just score higher.
+  area_mode: require
+
+# Area groups. Names are matched (substring, case-insensitive) against the
+# listing's neighborhood + street text, so both neighborhood and street names work.
+# Seeded from the MVP spec — add/remove from the Settings screen.
+areas:
+  - name: "דרום תל אביב"
+    places: ["פלורנטין", "נווה צדק", "שפירא", "לוינסקי", "שוק הכרמל", "כרם התימנים"]
+  - name: "מרכז תל אביב"
+    places: ["לבונטין", "רוטשילד", "דיזנגוף", "אבן גבירול"]
+
+preferences:
+  roommates: 3
+  balcony: preferred          # preferred | ignore
+  parking: preferred          # preferred | ignore
+  elevator: ignore            # preferred | ignore
+  broker: allowed_not_preferred   # allowed_not_preferred | ignore
+
+# Match score weights (points). Placeholders — tune freely.
+# The score is (points earned / points possible) * 100.
+scoring:
+  price: 25
+  area: 20
+  rooms: 15
+  size: 10
+  floor: 5
+  balcony: 5
+  parking: 5
+  roommate_fit: 15
+  no_broker: 3
+  condition: 5
+
+notifications:
+  telegram_enabled: true
+  min_score: 70               # only notify listings scoring at least this
+  max_per_scan: 10            # don't flood the phone
+  max_attempts: 5             # retries for a failed Telegram send
+
+ai:
+  enabled: true               # also needs GEMINI_API_KEY in .env
+  model: "gemini-flash-latest"
+  max_per_scan: 10
+
+yad2:
+  # Numeric Yad2 ids. Verify with:  python -m app.cli lookup "תל אביב"
+  # (Yad2's gw feed requires `region`; see README → "Yad2 ids").
+  region: 3
+  cities: [5000]
+  max_pages: 5
+  delay_between_requests_sec: 2.5
+  fetch_details: true         # fetch the full ad (description) for new matching listings
+
+schedule:
+  # Overridden by SCAN_INTERVAL_MINUTES in .env when set. Never below 5.
+  scan_interval_minutes: 15
