@@ -59,10 +59,10 @@ jobs:
         if: always()
         run: |
           [ -f data/hunter.db ] || exit 0
-          git config user.name "find-my-home-bot"
-          git config user.email "find-my-home-bot@users.noreply.github.com"
           rm -rf ../state && mkdir ../state && cd ../state
           git init -q -b bot-state
+          git config user.name "find-my-home-bot"
+          git config user.email "find-my-home-bot@users.noreply.github.com"
           cp "$GITHUB_WORKSPACE/data/hunter.db" .
           git add hunter.db
           git commit -q -m "state $(date -u +%FT%TZ)"
