@@ -5,8 +5,11 @@ name: hunt
 # branch between runs, so nothing is ever sent twice.
 #
 # Schedule: every 10 minutes (public repo → no Actions minutes limit).
-# GitHub may delay scheduled runs by a few minutes under load.
-# Scheduled runs only fire from the default branch (main).
+# GitHub's cron is best-effort (it can be delayed or skipped for a long time),
+# so each run on main also starts the next one ~10 minutes later (`next` job).
+# The concurrency group keeps at most one run going and one waiting, so extra
+# triggers (cron + chain) collapse instead of piling up.
+# To stop everything: Actions → hunt → "…" → Disable workflow.
 #
 # Secrets: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (required), GEMINI_API_KEY (optional).
 
@@ -22,6 +25,7 @@ permissions:
   contents: write           # to save the DB on the bot-state branch
   pages: write              # to publish the dashboard
   id-token: write
+  actions: write            # to start the next run
 
 concurrency:
   group: hunt               # never two scans at once
@@ -94,3 +98,16 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+  next:
+    # Keeps the 10-minute rhythm even when GitHub's cron doesn't fire.
+    needs: [scan, deploy]
+    if: always() && github.ref == 'refs/heads/main' && github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait, then start the next scan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 450
+          gh workflow run hunt.yml --repo "${{ github.repository }}" --ref main
