@@ -1,18 +1,18 @@
 name: hunt
-# Runs one scan in GitHub's cloud: Yad2 → filters → score → Telegram.
+# Runs one scan in GitHub's cloud: Telegram taps/commands → Yad2 → filters →
+# score → Telegram alerts, then rebuilds the dashboard site (GitHub Pages).
 # The database (which listings were already seen/sent) lives on the `bot-state`
 # branch between runs, so nothing is ever sent twice.
 #
-# Schedule: every 20 minutes, 03:00–22:59 UTC (≈ 06:00–01:59 Israel time).
-# Nights are skipped to stay inside the free 2,000 Actions minutes/month of a
-# private repo (~60 runs/day × ~1 min). A public repo has no such limit.
+# Schedule: every 10 minutes (public repo → no Actions minutes limit).
+# GitHub may delay scheduled runs by a few minutes under load.
 # Scheduled runs only fire from the default branch (main).
 #
 # Secrets: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (required), GEMINI_API_KEY (optional).
 
 on:
   schedule:
-    - cron: "*/20 3-22 * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch: {}     # "Run workflow" button = scan now
   push:
     branches: ["claude/**"]
@@ -20,6 +20,8 @@ on:
 
 permissions:
   contents: write           # to save the DB on the bot-state branch
+  pages: write              # to publish the dashboard
+  id-token: write
 
 concurrency:
   group: hunt               # never two scans at once
@@ -68,3 +70,27 @@ jobs:
           git commit -q -m "state $(date -u +%FT%TZ)"
           git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" bot-state
           echo "Database saved"
+
+      - name: Build dashboard
+        if: always() && github.ref == 'refs/heads/main'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python -m app.cli build-site site
+
+      - uses: actions/upload-pages-artifact@v3
+        if: always() && github.ref == 'refs/heads/main'
+        with:
+          path: site
+
+  deploy:
+    # Publishes the dashboard to https://<user>.github.io/<repo>/ .
+    # Needs Settings → Pages → Source: "GitHub Actions" (one-time).
+    needs: scan
+    if: always() && github.ref == 'refs/heads/main' && needs.scan.result != 'skipped'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

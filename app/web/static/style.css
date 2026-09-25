@@ -95,3 +95,6 @@ input, select { font: inherit; color: var(--text); background: var(--bg); border
   .card { grid-template-columns: 1fr; }
   .gallery { height: 200px; }
 }
+a.primary { display: inline-block; text-decoration: none; margin-top: 6px; }
+#settings ul { padding-inline-start: 18px; margin: 6px 0; }
+#settings li { margin: 3px 0; }

@@ -4,8 +4,10 @@
     python -m app.cli check-yad2     can we reach Yad2? prints a parsed sample
     python -m app.cli lookup "תל אביב"   find Yad2 region/city ids for config.yaml
     python -m app.cli test-telegram  send a test message to your phone
+    python -m app.cli build-site DIR  write the static dashboard (GitHub Pages)
 """
 import json
+import os
 import sys
 
 from app import config, db, pipeline
@@ -23,7 +25,7 @@ def main(argv):
 
     if cmd == "scan":
         conn = db.connect()
-        stats = pipeline.run_scan(conn, settings)
+        stats = pipeline.run_cycle(conn, settings)
         conn.close()  # checkpoints the WAL so the .db file alone holds everything
         log.info(f"Result: {stats}")
         return 1 if stats["error"] and not stats["fetched"] else 0
@@ -39,6 +41,14 @@ def main(argv):
         log.info(f"OK: {len(items)} listings on page 1")
         if items:
             print(json.dumps(src.normalize(items[0]).to_dict(), ensure_ascii=False, indent=2))
+    elif cmd == "build-site":
+        from app import site
+        from app.notify.bot import effective_settings
+        conn = db.connect()
+        n = site.build(conn, effective_settings(conn, settings), argv[2] if len(argv) > 2 else "site",
+                       repo=os.environ.get("GITHUB_REPOSITORY"))
+        conn.close()
+        log.info(f"Site built with {n} listings")
     elif cmd == "lookup":
         print(json.dumps(lookup_ids(" ".join(argv[2:])), ensure_ascii=False, indent=2))
     elif cmd == "test-telegram":
