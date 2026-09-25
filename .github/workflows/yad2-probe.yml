@@ -1,0 +1,22 @@
+name: yad2-probe
+# Checks whether Yad2's feed answers from GitHub's cloud servers.
+# Read-only: looks up the Tel Aviv ids and fetches one page of listings.
+on:
+  push:
+    paths: [".github/workflows/yad2-probe.yml", "app/sources/**"]
+  workflow_dispatch: {}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Look up Tel Aviv ids
+        continue-on-error: true
+        run: python -m app.cli lookup "תל אביב" | head -60
+      - name: Fetch one page of listings
+        continue-on-error: true
+        run: python -m app.cli check-yad2

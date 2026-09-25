@@ -1,0 +1,83 @@
+{
+  "data": {
+    "private": [
+      {
+        "token": "florentin1",
+        "price": 10800,
+        "address": {
+          "city": {"text": "תל אביב יפו"},
+          "neighborhood": {"text": "פלורנטין"},
+          "street": {"text": "הרצל"},
+          "house": {"number": 12, "floor": 3},
+          "coords": {"lat": 32.057, "lon": 34.77}
+        },
+        "additionalDetails": {"roomsCount": 4, "squareMeter": 92, "property": {"text": "דירה"}},
+        "metaData": {"coverImage": "https://img.example/1.jpg", "images": ["https://img.example/1.jpg", "https://img.example/2.jpg"]},
+        "tags": [{"name": "מרפסת"}, {"name": "מעלית"}]
+      },
+      {
+        "token": "ground1",
+        "price": 9500,
+        "address": {
+          "city": {"text": "תל אביב יפו"},
+          "neighborhood": {"text": "נווה צדק"},
+          "street": {"text": "שבזי"},
+          "house": {"number": 5, "floor": 0}
+        },
+        "additionalDetails": {"roomsCount": 4, "squareMeter": 85, "property": {"text": "דירה"}},
+        "metaData": {"images": []},
+        "tags": []
+      }
+    ],
+    "agency": [
+      {
+        "token": "levontin1",
+        "price": 11900,
+        "address": {
+          "city": {"text": "תל אביב יפו"},
+          "neighborhood": {"text": "לב תל אביב"},
+          "street": {"text": "לבונטין"},
+          "house": {"number": 7, "floor": 2}
+        },
+        "additionalDetails": {"roomsCount": 4, "property": {"text": "דירה"}},
+        "metaData": {"images": ["https://img.example/3.jpg"]},
+        "tags": [{"name": "חניה"}]
+      },
+      {
+        "token": "toopricey",
+        "price": 12001,
+        "address": {
+          "city": {"text": "תל אביב יפו"},
+          "neighborhood": {"text": "פלורנטין"},
+          "street": {"text": "ויטל"},
+          "house": {"number": 3, "floor": 4}
+        },
+        "additionalDetails": {"roomsCount": 4, "squareMeter": 100, "property": {"text": "דירה"}},
+        "metaData": {"images": []},
+        "tags": []
+      },
+      {
+        "token": "ramataviv1",
+        "price": 11000,
+        "address": {
+          "city": {"text": "תל אביב יפו"},
+          "neighborhood": {"text": "רמת אביב"},
+          "street": {"text": "איינשטיין"},
+          "house": {"number": 40, "floor": 5}
+        },
+        "additionalDetails": {"roomsCount": 4, "squareMeter": 95, "property": {"text": "דירה"}},
+        "metaData": {"images": []},
+        "tags": []
+      }
+    ],
+    "platinum": [
+      {
+        "token": "florentin1",
+        "price": 10800,
+        "address": {"city": {"text": "תל אביב יפו"}, "neighborhood": {"text": "פלורנטין"}},
+        "additionalDetails": {"roomsCount": 4}
+      }
+    ],
+    "pagination": {"total": 5, "totalPages": 1}
+  }
+}

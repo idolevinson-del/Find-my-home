@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apartment Hunter</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">🏠 Apartment Hunter</div>
+  <nav>
+    <button data-view="inbox" class="tab active">דירות</button>
+    <button data-view="saved" class="tab">❤️ שמורות</button>
+    <button data-view="rejected" class="tab">נדחו</button>
+    <button data-view="settings" class="tab">⚙️ הגדרות</button>
+  </nav>
+</header>
+
+<main>
+  <section id="hero">
+    <div id="search-summary" class="search-summary"></div>
+    <div class="hero-row">
+      <div id="headline" class="headline"></div>
+      <button id="scan-btn" class="primary">🔍 סרוק עכשיו</button>
+    </div>
+    <div id="scan-info" class="muted"></div>
+  </section>
+
+  <section id="list"></section>
+  <section id="settings" hidden></section>
+</main>
+
+<template id="card-tpl">
+  <article class="card">
+    <div class="gallery"><img alt="" loading="lazy"><span class="img-count"></span></div>
+    <div class="body">
+      <div class="row1">
+        <div>
+          <span class="badge-new">🔥 חדש</span>
+          <h3 class="place"></h3>
+          <div class="street muted"></div>
+        </div>
+        <div class="score"><div class="score-num"></div><div class="score-label">MATCH</div></div>
+      </div>
+      <div class="price"></div>
+      <div class="facts"></div>
+      <ul class="breakdown"></ul>
+      <div class="ai"></div>
+      <details class="desc"><summary>תיאור</summary><p></p></details>
+      <div class="actions">
+        <a class="open" target="_blank" rel="noopener">פתח ביד2 ↗</a>
+        <button class="save">❤️ שמור</button>
+        <button class="reject">❌ לא מתאים</button>
+      </div>
+    </div>
+  </article>
+</template>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
