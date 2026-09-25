@@ -51,6 +51,8 @@ def format_message(row):
     ai = json.loads(row["ai_analysis"]) if row["ai_analysis"] else None
     if ai and ai.get("summary"):
         lines += ["", f"🤖 {e(ai['summary'])}"]
+    # Plain link too, not just the button — the phone number is on the ad page.
+    lines += ["", f'🔗 <a href="{e(row["url"])}">למודעה ביד2 (טלפון ופרטים)</a>', e(row["url"])]
     keyboard = {"inline_keyboard": [[{"text": "פתח מודעה", "url": row["url"]}]]}
     return "\n".join(lines), keyboard
 
