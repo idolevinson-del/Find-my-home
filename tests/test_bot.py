@@ -142,3 +142,15 @@ def test_multi_line_natural_commands(conn, settings):
     tg = FakeTelegram([msg(2, "בלי קרקע")])
     bot.process_updates(conn, settings, session=tg)
     assert bot.effective_settings(conn, settings)["search"]["exclude_ground_floor"] is True
+
+
+def test_wizard_message(conn, settings):
+    text = "קבע אזורים: פלורנטין, רחוב אילת בתל אביב, נווה צדק\nחדרים 3\nתקציב 10000\nגודל 70\nבלי קרקע\nשותפים 2\nמרפסת חשוב\nחניה לא משנה\nמעלית חשוב"
+    tg = FakeTelegram([msg(1, text)])
+    assert bot.process_updates(conn, settings, session=tg)
+    s = bot.effective_settings(conn, settings)
+    assert s["areas"] == [{"name": "האזורים שלי", "places": ["פלורנטין", "אילת", "נווה צדק"]}]
+    assert (s["search"]["min_rooms"], s["search"]["max_rooms"], s["search"]["max_price"], s["search"]["min_size"]) == (3, 3, 10000, 70)
+    assert s["preferences"]["roommates"] == 2
+    assert (s["preferences"]["balcony"], s["preferences"]["parking"], s["preferences"]["elevator"]) == ("preferred", "ignore", "preferred")
+    assert "לא הבנתי" not in tg.sent("sendMessage")[0]["text"]

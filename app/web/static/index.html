@@ -20,7 +20,10 @@
 
 <main>
   <section id="hero">
-    <div id="search-summary" class="search-summary"></div>
+    <div class="search-row">
+      <div id="search-summary" class="search-summary"></div>
+      <button id="wizard-btn" class="ghost">🧭 שנה חיפוש</button>
+    </div>
     <div class="hero-row">
       <div id="headline" class="headline"></div>
       <button id="scan-btn" class="primary">🔍 סרוק עכשיו</button>
@@ -57,6 +60,8 @@
     </div>
   </article>
 </template>
+
+<div id="wizard" class="wizard" hidden></div>
 
 <script src="/static/app.js"></script>
 </body>
