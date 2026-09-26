@@ -51,3 +51,27 @@ def test_backlog_stops_on_failure(conn, settings, feed, monkeypatch):
     g = FakeGemini(fail=True)
     pipeline.run_scan(conn, settings, [FixtureYad2(settings, feed)], http_session=g)
     assert g.calls == 1
+
+
+def test_busy_model_is_retried(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr(ai, "RETRY_DELAY", 0)
+    codes = iter([503, 503, 200])
+
+    class Session:
+        calls = 0
+
+        def post(self, url, **kw):
+            Session.calls += 1
+            code = next(codes)
+
+            class R:
+                status_code = code
+                text = "busy"
+
+                def json(self_inner):
+                    return {"candidates": [{"content": {"parts": [{"text": json.dumps(ANSWER)}]}}]}
+            return R()
+
+    out = ai.analyze(make_listing(description="x"), {"ai": {"enabled": True}}, session=Session())
+    assert out and out["condition"] == "renovated" and Session.calls == 3

@@ -7,6 +7,7 @@ REST call via `requests` (same approach as Apartment-Bot's llm.py), no SDK.
 """
 import json
 import logging
+import time
 
 import requests
 
@@ -53,6 +54,9 @@ ENUMS = {
     "condition": {"new", "renovated", "good", "fair", "poor", "unknown"},
     "likely_noise_level": {"low", "medium", "high", "unknown"},
 }
+RETRIES = 2
+RETRY_DELAY = 5  # seconds; doubled on the second retry
+
 BOOLS = ("has_balcony", "has_parking", "has_elevator", "couples_only", "small_room_warning")
 
 
@@ -87,12 +91,17 @@ def analyze(listing, settings, session=requests):
                                "title", "neighborhood", "street", "price", "rooms", "size_sqm",
                                "floor", "parking", "balcony", "elevator")})
     try:
-        r = session.post(
-            ENDPOINT.format(model=cfg.get("model", "gemini-flash-latest")),
-            params={"key": secret("GEMINI_API_KEY")},
-            json={"contents": [{"parts": [{"text": prompt}]}],
-                  "generationConfig": {"temperature": 0, "responseMimeType": "application/json"}},
-            timeout=45)
+        for attempt in range(RETRIES + 1):
+            r = session.post(
+                ENDPOINT.format(model=cfg.get("model", "gemini-flash-latest")),
+                params={"key": secret("GEMINI_API_KEY")},
+                json={"contents": [{"parts": [{"text": prompt}]}],
+                      "generationConfig": {"temperature": 0, "responseMimeType": "application/json"}},
+                timeout=45)
+            # 429 / 503 = busy or rate-limited: usually gone within seconds.
+            if r.status_code not in (429, 503) or attempt == RETRIES:
+                break
+            time.sleep(RETRY_DELAY * (attempt + 1))
         if r.status_code != 200:
             log.warning(f"Gemini HTTP {r.status_code}: {r.text[:200]}")
             return None
