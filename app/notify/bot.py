@@ -34,6 +34,7 @@ HELP = """<b>פקודות</b> (אפשר בעברית, בלי סלאש):
 • <b>הוסף אזור אילת</b> / <b>הסר אזור אילת</b> — שכונה או רחוב
 אפשר כמה פקודות בהודעה אחת, כל אחת בשורה נפרדת.
 • <b>אזורים</b> — רשימת האזורים
+• <b>שותפים 3</b> · <b>מרפסת חשוב</b> / <b>חניה לא משנה</b>
 • <b>ציון 70</b> — ציון מינימלי להתראה
 • <b>עזרה</b>
 השינויים נכנסים לתוקף בסריקה הבאה (תוך כמה דקות)."""
@@ -167,6 +168,25 @@ def apply_command(conn, base, text):
             over["areas"] = [g for g in areas if g.get("places") or g["name"] != BOT_AREA_GROUP]
             save()
             return f"✓ הוסר אזור: {place}", True
+        # Sent by the site's search wizard: replaces the whole area list.
+        m = re.match(r"^(?:set_areas|קבע אזורים)\s*:?\s*(.+)$", t)
+        if m:
+            places = [p for p in (clean_place(x) for x in re.split(r"[,،]", m.group(1))) if p]
+            over["areas"] = [{"name": "האזורים שלי", "places": places}]
+            save()
+            return f"✓ אזורים: {', '.join(places)}", True
+        m = re.match(r"^(?:roommates|שותפים)\s+(\d+)$", low)
+        if m:
+            patch("preferences", "roommates", int(m.group(1)))
+            save()
+            return f"✓ {m.group(1)} שותפים", True
+        m = re.match(r"^(מרפסת|חניה|חנייה|מעלית)\s+(חשוב|חשובה|כן|לא משנה|לא)$", t)
+        if m:
+            key = {"מרפסת": "balcony", "חניה": "parking", "חנייה": "parking", "מעלית": "elevator"}[m.group(1)]
+            preferred = m.group(2) in ("חשוב", "חשובה", "כן")
+            patch("preferences", key, "preferred" if preferred else "ignore")
+            save()
+            return f"✓ {m.group(1)}: {'חשוב' if preferred else 'לא משנה'}", True
     except ValueError:
         return "לא הבנתי את המספר 🤔\n\n" + HELP, False
     return "לא הבנתי 🤔\n\n" + HELP, False

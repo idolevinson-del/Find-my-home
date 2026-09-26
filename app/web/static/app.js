@@ -290,3 +290,122 @@ function renderSettings() {
   await loadList();
   poll();
 })();
+
+// ---------- search wizard: one question per screen ----------
+const WIZ_KEY = "hunter-wizard-done";
+function openWizard() {
+  const s = settings.search, p = settings.preferences;
+  const a = {
+    places: (settings.areas || []).flatMap(g => g.places || []),
+    rooms: s.min_rooms || 4, more: !s.max_rooms || s.max_rooms > s.min_rooms,
+    price: s.max_price || 12000, size: s.min_size || 0, ground: !s.exclude_ground_floor,
+    roommates: p.roommates || 1,
+    wants: ["balcony", "parking", "elevator"].filter(k => p[k] === "preferred"),
+  };
+  const suggestions = [...new Set([...a.places, ...((STATIC && STATIC.neighborhoods) || [])])];
+  const steps = [
+    { q: "איפה לחפש?", hint: "בחר שכונות או רחובות. אפשר גם להקליד.", render: el => {
+      el.innerHTML = `<input class="big" placeholder="הקלד שכונה או רחוב ולחץ Enter"><div class="opts"></div>`;
+      const draw = () => { $(".opts", el).innerHTML = suggestions.map(x => `<button class="opt ${a.places.includes(x) ? "on" : ""}">${esc(x)}</button>`).join("");
+        el.querySelectorAll(".opt").forEach((b, i) => b.onclick = () => { const x = suggestions[i]; a.places = a.places.includes(x) ? a.places.filter(y => y !== x) : [...a.places, x]; draw(); }); };
+      $("input", el).onkeydown = e => { if (e.key === "Enter" && e.target.value.trim()) { const x = e.target.value.trim(); if (!suggestions.includes(x)) suggestions.unshift(x); if (!a.places.includes(x)) a.places.push(x); e.target.value = ""; draw(); } };
+      draw(); }, ok: () => a.places.length > 0 },
+    { q: "כמה חדרים?", hint: "", render: el => choice(el, [2, 2.5, 3, 3.5, 4, 4.5, 5, 6], a.rooms, v => a.rooms = v, x => `${x}`, () =>
+        `<label class="check" style="margin-top:14px"><input type="checkbox" ${a.more ? "checked" : ""}> גם יותר חדרים</label>`, box => box.onchange = e => a.more = e.target.checked) },
+    { q: "מה התקציב החודשי?", hint: "מחיר מקסימלי בשקלים", render: el => {
+      el.innerHTML = `<input class="big" type="number" inputmode="numeric" step="100" value="${a.price}"><div class="opts"></div>`;
+      $("input", el).oninput = e => a.price = Number(e.target.value);
+      $(".opts", el).innerHTML = [6000, 8000, 10000, 12000, 15000].map(v => `<button class="opt">₪${fmt(v)}</button>`).join("");
+      el.querySelectorAll(".opt").forEach((b, i) => b.onclick = () => { a.price = [6000, 8000, 10000, 12000, 15000][i]; $("input", el).value = a.price; }); },
+      ok: () => a.price >= 1000 },
+    { q: "מה הגודל המינימלי?", hint: 'במ"ר', render: el => choice(el, [0, 50, 60, 70, 80, 90, 100], a.size, v => a.size = v, x => x ? `${x}+` : "לא משנה") },
+    { q: "קומת קרקע מתאימה?", hint: "", render: el => choice(el, [true, false], a.ground, v => a.ground = v, x => x ? "כן, אפשר" : "לא, בלי קרקע") },
+    { q: "כמה אנשים יגורו בדירה?", hint: "כולל אותך", render: el => choice(el, [1, 2, 3, 4, 5], a.roommates, v => a.roommates = v, x => x === 1 ? "רק אני" : `${x}`) },
+    { q: "מה חשוב לך?", hint: "אפשר לבחור כמה, או כלום", render: el => {
+      const names = { balcony: "🌿 מרפסת", parking: "🅿️ חניה", elevator: "🛗 מעלית" };
+      const draw = () => { el.innerHTML = `<div class="opts">${Object.keys(names).map(k => `<button class="opt ${a.wants.includes(k) ? "on" : ""}" data-k="${k}">${names[k]}</button>`).join("")}</div>`;
+        el.querySelectorAll(".opt").forEach(b => b.onclick = () => { const k = b.dataset.k; a.wants = a.wants.includes(k) ? a.wants.filter(x => x !== k) : [...a.wants, k]; draw(); }); };
+      draw(); } },
+    { q: "זה מה שאחפש בשבילך", hint: "", summary: true, render: el => {
+      el.innerHTML = `<ul class="wz-summary">
+        <li>📍 ${esc(a.places.join(", "))}</li>
+        <li>🛏 ${a.rooms}${a.more ? "+" : ""} חדרים</li>
+        <li>💰 עד ₪${fmt(a.price)}</li>
+        <li>📐 ${a.size ? `לפחות ${a.size} מ"ר` : "כל גודל"}</li>
+        <li>🏢 ${a.ground ? "כולל קומת קרקע" : "בלי קומת קרקע"}</li>
+        <li>👥 ${a.roommates === 1 ? "רק אני" : `${a.roommates} אנשים`}</li>
+        <li>⭐ ${a.wants.length ? a.wants.map(k => ({ balcony: "מרפסת", parking: "חניה", elevator: "מעלית" }[k])).join(", ") : "בלי העדפות מיוחדות"}</li>
+      </ul>${STATIC ? `<p class="wz-note">בלחיצה על "שמור" ייפתח הבוט בטלגרם עם ההגדרות מוכנות. לחץ שם על שליחה, והחיפוש יתעדכן תוך כ-10 דקות.</p>` : ""}`; } },
+  ];
+
+  function choice(el, values, current, set, label, extra, bindExtra) {
+    const draw = cur => {
+      el.innerHTML = `<div class="opts">${values.map((v, i) => `<button class="opt ${v === cur ? "on" : ""}" data-i="${i}">${label(v)}</button>`).join("")}</div>${extra ? extra() : ""}`;
+      el.querySelectorAll(".opt").forEach(b => b.onclick = () => { set(values[+b.dataset.i]); draw(values[+b.dataset.i]); });
+      if (bindExtra) bindExtra($("input[type=checkbox]", el));
+    };
+    draw(current);
+  }
+
+  function commands() {
+    return [
+      `קבע אזורים: ${a.places.join(", ")}`,
+      `חדרים ${a.rooms}${a.more ? "-10" : ""}`,
+      `תקציב ${a.price}`,
+      `גודל ${a.size}`,
+      a.ground ? "אפשר קרקע" : "בלי קרקע",
+      `שותפים ${a.roommates}`,
+      ...["balcony", "parking", "elevator"].map(k => `${{ balcony: "מרפסת", parking: "חניה", elevator: "מעלית" }[k]} ${a.wants.includes(k) ? "חשוב" : "לא משנה"}`),
+    ].join("\n");
+  }
+
+  async function finish() {
+    try { localStorage.setItem(WIZ_KEY, "1"); } catch {}
+    if (!STATIC) {
+      settings = await api("/api/settings", { method: "PUT", body: JSON.stringify({
+        areas: [{ name: "האזורים שלי", places: a.places }],
+        search: { min_rooms: a.rooms, max_rooms: a.more ? 10 : a.rooms, max_price: a.price, min_size: a.size, exclude_ground_floor: !a.ground },
+        preferences: { roommates: a.roommates, balcony: a.wants.includes("balcony") ? "preferred" : "ignore",
+          parking: a.wants.includes("parking") ? "preferred" : "ignore", elevator: a.wants.includes("elevator") ? "preferred" : "ignore" } }) });
+      searchChips(settings); close(); loadList(); return;
+    }
+    const text = commands();
+    try { await navigator.clipboard.writeText(text); } catch {}
+    if (STATIC.bot) window.location.href = `https://t.me/${STATIC.bot}?text=${encodeURIComponent(text)}`;
+    close();
+  }
+
+  const box = $("#wizard");
+  let i = 0;
+  const close = () => { box.hidden = true; document.body.style.overflow = ""; };
+  function show() {
+    const st = steps[i];
+    box.innerHTML = `<div class="wz">
+      <div class="wz-top"><span class="muted">${i + 1} / ${steps.length}</span><button class="ghost" data-x>✕</button></div>
+      <div class="wz-progress"><div style="width:${100 * (i + 1) / steps.length}%"></div></div>
+      <h2>${st.q}</h2>${st.hint ? `<p class="hint">${st.hint}</p>` : ""}
+      <div class="wz-body"></div>
+      <div class="wz-nav">${i ? `<button class="ghost" data-back>→ חזרה</button>` : ""}<button class="primary" data-next>${st.summary ? "✓ שמור את החיפוש" : "הבא ←"}</button></div>
+    </div>`;
+    st.render($(".wz-body", box));
+    $("[data-x]", box).onclick = () => { try { localStorage.setItem(WIZ_KEY, "1"); } catch {} close(); };
+    if (i) $("[data-back]", box).onclick = () => { i--; show(); };
+    $("[data-next]", box).onclick = () => {
+      if (st.ok && !st.ok()) return;
+      if (st.summary) finish(); else { i++; show(); }
+    };
+    box.scrollTop = 0;
+  }
+  box.hidden = false;
+  document.body.style.overflow = "hidden";
+  show();
+}
+
+$("#wizard-btn").addEventListener("click", () => settings && openWizard());
+(async function firstVisit() {
+  // Open the wizard once for first-time visitors (after boot has loaded settings).
+  for (let n = 0; n < 50 && !settings; n++) await new Promise(r => setTimeout(r, 100));
+  let seen = false;
+  try { seen = !!localStorage.getItem(WIZ_KEY); } catch { seen = true; }
+  if (settings && !seen) openWizard();
+})();

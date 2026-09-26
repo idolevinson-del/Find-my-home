@@ -39,12 +39,17 @@ def build(conn, settings, out_dir, repo=None):
 
     rows = conn.execute("SELECT * FROM listings WHERE passes_filters=1 ORDER BY first_seen_at DESC").fetchall()
     scan = db.last_scan(conn)
+    # Real neighborhood names seen on Yad2 (for the search wizard's suggestions).
+    hoods = [r[0] for r in conn.execute(
+        "SELECT neighborhood, COUNT(*) n FROM listings WHERE neighborhood IS NOT NULL "
+        "GROUP BY neighborhood ORDER BY n DESC LIMIT 80")]
     data = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "listings": [db.row_to_api(r) for r in rows],
         "settings": settings,
         "last_scan": dict(scan) if scan else None,
         "bot": bot_username(),
+        "neighborhoods": hoods,
         "repo": repo,
     }
     (out / "data.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
