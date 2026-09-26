@@ -113,6 +113,24 @@ def run_scan(conn, settings, sources=None, http_session=None):
             ai_budget -= 1
         evaluate(conn, listing_id, settings)
 
+    # Leftover AI budget: analyze matching listings found before AI was switched on.
+    # Stops at the first failure (bad key, quota) instead of retrying every listing.
+    if ai_budget > 0:
+        backlog = conn.execute(
+            "SELECT id FROM listings WHERE passes_filters=1 AND ai_analysis IS NULL "
+            "AND status NOT IN ('REJECTED', 'TAKEN') ORDER BY first_seen_at DESC LIMIT ?", (ai_budget,)).fetchall()
+        done = 0
+        for r in backlog:
+            listing = db.row_to_listing(db.get_listing(conn, r["id"]))
+            analysis = ai.analyze(listing, settings, **({"session": http_session} if http_session else {}))
+            if not analysis:
+                break
+            db.set_ai_analysis(conn, r["id"], analysis)
+            evaluate(conn, r["id"], settings)
+            done += 1
+        if done:
+            log.info(f"AI analyzed {done} earlier listing(s)")
+
     # Queue notifications for the best new matches (capped so we never flood the phone).
     ncfg = settings.get("notifications", {})
     min_score = int(ncfg.get("min_score", 0))
