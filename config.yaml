@@ -53,6 +53,7 @@ notifications:
 ai:
   enabled: true               # also needs GEMINI_API_KEY in .env
   model: "gemini-flash-latest"
+  fallback_models: ["gemini-flash-lite-latest"]   # used when the main model is busy
   max_per_scan: 10
 
 yad2:

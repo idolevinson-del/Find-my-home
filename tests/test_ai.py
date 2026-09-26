@@ -75,3 +75,26 @@ def test_busy_model_is_retried(monkeypatch):
 
     out = ai.analyze(make_listing(description="x"), {"ai": {"enabled": True}}, session=Session())
     assert out and out["condition"] == "renovated" and Session.calls == 3
+
+
+def test_falls_back_to_next_model(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setattr(ai, "RETRY_DELAY", 0)
+    urls = []
+
+    class Session:
+        def post(self, url, **kw):
+            urls.append(url)
+            busy = "main-model" in url
+
+            class R:
+                status_code = 503 if busy else 200
+                text = "busy"
+
+                def json(self_inner):
+                    return {"candidates": [{"content": {"parts": [{"text": json.dumps(ANSWER)}]}}]}
+            return R()
+
+    settings = {"ai": {"enabled": True, "model": "main-model", "fallback_models": ["lite-model"]}}
+    out = ai.analyze(make_listing(description="x"), settings, session=Session())
+    assert out and sum("main-model" in u for u in urls) == 3 and "lite-model" in urls[-1]

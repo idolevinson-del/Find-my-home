@@ -90,18 +90,25 @@ def analyze(listing, settings, session=requests):
                            **{k: getattr(listing, k) for k in (
                                "title", "neighborhood", "street", "price", "rooms", "size_sqm",
                                "floor", "parking", "balcony", "elevator")})
+    models = [cfg.get("model", "gemini-flash-latest")] + list(cfg.get("fallback_models") or [])
     try:
-        for attempt in range(RETRIES + 1):
-            r = session.post(
-                ENDPOINT.format(model=cfg.get("model", "gemini-flash-latest")),
-                params={"key": secret("GEMINI_API_KEY")},
-                json={"contents": [{"parts": [{"text": prompt}]}],
-                      "generationConfig": {"temperature": 0, "responseMimeType": "application/json"}},
-                timeout=45)
-            # 429 / 503 = busy or rate-limited: usually gone within seconds.
-            if r.status_code not in (429, 503) or attempt == RETRIES:
+        for model in models:
+            for attempt in range(RETRIES + 1):
+                r = session.post(
+                    ENDPOINT.format(model=model),
+                    params={"key": secret("GEMINI_API_KEY")},
+                    json={"contents": [{"parts": [{"text": prompt}]}],
+                          "generationConfig": {"temperature": 0, "responseMimeType": "application/json"}},
+                    timeout=45)
+                # 429 / 503 = busy or rate-limited: usually gone within seconds.
+                if r.status_code not in (429, 503) or attempt == RETRIES:
+                    break
+                time.sleep(RETRY_DELAY * (attempt + 1))
+            # Busy, rate-limited or unknown model → try the next model in the list.
+            if r.status_code not in (404, 429, 503):
                 break
-            time.sleep(RETRY_DELAY * (attempt + 1))
+            if model != models[-1]:
+                log.info(f"Gemini {model} unavailable (HTTP {r.status_code}); trying {models[models.index(model) + 1]}")
         if r.status_code != 200:
             log.warning(f"Gemini HTTP {r.status_code}: {r.text[:200]}")
             return None
