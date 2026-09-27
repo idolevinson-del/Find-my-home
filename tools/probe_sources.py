@@ -39,9 +39,9 @@ def verdict(name, r, err=None, extra=""):
         print(f"[ {name} ]  תשובה לא צפויה (HTTP {r.status_code}) {r.text[:80]!r}")
 
 
-def call(method, url, **kw):
+def call(method, url, headers=None, **kw):
     try:
-        return getattr(http, method)(url, impersonate="chrome124", timeout=20, headers=HEAD, **kw), None
+        return getattr(http, method)(url, impersonate="chrome124", timeout=20, headers=headers or HEAD, **kw), None
     except Exception as e:
         return None, e
 
